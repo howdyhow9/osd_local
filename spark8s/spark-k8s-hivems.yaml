@@ -1,0 +1,49 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: osds-spark-app
+  namespace: spark-apps
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: "gvsbharish01/osdspark8s:v1.0.7"
+  imagePullPolicy: Always
+  mainApplicationFile: s3a://scripts/replication/Ingest_Replication_Dbz_Full.py
+  sparkVersion: "3.5.0"
+  timeToLiveSeconds: 30
+  restartPolicy:
+    type: Never
+  driver:
+    cores: 2                   # Adjust the number of cores for the driver
+    coreLimit: "4"             # Limit the maximum CPU cores for the driver
+    memory: "4G"               # Set the memory request for the driver
+    labels:
+      version: "3.5.0"
+    serviceAccount: spark
+    volumeMounts:
+      - name: ivy
+        mountPath: /tmp
+  executor:
+    cores: 2                   # Adjust the number of cores per executor instance
+    coreLimit: "4"             # Limit the maximum CPU cores per executor instance
+    instances: 1               # Adjust the number of executor instances
+    memory: "4G"               # Set the memory request per executor instance
+    labels:
+      version: "3.5.0"
+    volumeMounts:
+      - name: ivy
+        mountPath: /tmp
+  volumes:
+    - name: ivy
+      emptyDir: { }
+  sparkConf:
+    spark.driver.extraJavaOptions: "-Divy.cache.dir=/tmp -Divy.home=/tmp"
+    spark.hadoop.fs.s3a.impl: "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    spark.hadoop.fs.s3a.fast.upload: "true"
+    spark.hadoop.fs.s3a.endpoint: "http://host.docker.internal:9000"
+    spark.hadoop.fs.s3a.path.style.access: "true"
+    spark.hadoop.fs.s3a.access.key: "minioadmin"
+    spark.hadoop.fs.s3a.secret.key: "minioadmin"
+    spark.ui.port: "4041"
+    spark.kubernetes.file.upload.path: "s3a://delta/tmp"

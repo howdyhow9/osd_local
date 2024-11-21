@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-thrift-service
+spec:
+  clusterIP: 10.96.0.13
+  selector:
+    app: spark-thrift-server
+  ports:
+    - name: thrift-server-port
+      protocol: TCP
+      port: 10000
+      targetPort: 10000
+    - protocol: TCP
+      name: spark-driver-port
+      port: 7078
+      targetPort: 7078
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-thrift-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-thrift-server
+  template:
+    metadata:
+      labels:
+        app: spark-thrift-server
+    spec:
+      serviceAccountName: spark
+      containers:
+        - name: thrift-server
+          image: gvsbharish01/osdspark8s:v1.0.7
+          command:
+            - bash
+            - -c
+            - >
+              /opt/spark/sbin/start-thriftserver.sh 
+              --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension 
+              --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog 
+              --conf spark.sql.warehouse.dir=s3a://osds-data/
+              --conf hive.metastore.warehouse.dir=s3a://osds-data/
+              --conf javax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/hive_metastore \
+              --conf spark.sql.catalogImplementation=hive \
+              --conf javax.jdo.option.ConnectionDriverName=org.postgresql.Driver \
+              --conf javax.jdo.option.ConnectionUserName=hive \
+              --conf javax.jdo.option.ConnectionPassword=GUYgsjsj@123 \
+              --conf datanucleus.schema.autoCreateTables=true \
+              --conf hive.metastore.schema.verification=false \
+              --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+              --conf spark.hadoop.fs.s3a.fast.upload=true
+              --conf spark.hadoop.fs.s3a.endpoint=http://host.docker.internal:9000
+              --conf spark.hadoop.fs.s3a.path.style.access=true
+              --conf spark.hadoop.fs.s3a.access.key=minioadmin
+              --conf spark.hadoop.fs.s3a.secret.key=minioadmin
+              --conf spark.ui.port=4041
+              --conf spark.kubernetes.file.upload.path=s3a://osds-data/tmp
+              --packages 'io.delta:delta-spark_2.12:3.1.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4' \
+              && tail -f /opt/spark/logs/spark--org.apache.*
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "/opt/spark/sbin/stop-thriftserver.sh > /proc/1/fd/1"]
+          env:
+            - name: SPARK_CONF_DIR
+              value: "/opt/spark/conf"
+            - name: AWS_ACCESS_KEY_ID
+              value: "minioadmin"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "minioadmin"
+          ports:
+            - name: ui
+              containerPort: 4040
+            - name: thrift
+              containerPort: 10000
+      terminationGracePeriodSeconds: 60
