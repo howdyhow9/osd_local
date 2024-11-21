@@ -73,7 +73,7 @@ jobs:
 
       - name: Apply Postgres for Hive
         run: |
-          kubectl apply -f spark8s/postgres/postgres-config.yaml -f spark8s/postgres/postgres-config-pvc-svc-statefulset.yaml -f spark8s/postgres/postgres-svc.yaml -n spark-apps
+          kubectl apply -f spark8s/postgres/postgres-config.yaml -f spark8s/postgres/postgres-config-pvc-svc-statefulset.yaml -n spark-apps
 
       - name: Apply Hive Metastore Configurations
         run: |
