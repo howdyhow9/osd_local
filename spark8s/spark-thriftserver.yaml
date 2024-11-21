@@ -3,7 +3,6 @@ kind: Service
 metadata:
   name: spark-thrift-service
 spec:
-  clusterIP: 10.96.0.13
   selector:
     app: spark-thrift-server
   ports:
