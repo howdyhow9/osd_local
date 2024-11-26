@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: endpointslice-controller-role
+  namespace: spark-apps
+rules:
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: endpointslice-controller-binding
+  namespace: spark-apps
+subjects:
+  - kind: ServiceAccount
+    name: endpointslice-controller
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: endpointslice-controller-role
+  apiGroup: rbac.authorization.k8s.io

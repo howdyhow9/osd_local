@@ -9,7 +9,7 @@ spec:
   mode: cluster
   image: "gvsbharish01/osdspark8s:v1.0.7"
   imagePullPolicy: Always
-  mainApplicationFile: s3a://scripts/replication/Ingest_Replication_Dbz_Full.py
+  mainApplicationFile: s3a://scripts/basic_spark_hivems.py
   sparkVersion: "3.5.0"
   timeToLiveSeconds: 30
   restartPolicy:
