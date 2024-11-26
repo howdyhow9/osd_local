@@ -56,7 +56,6 @@ spec:
               --conf spark.hadoop.fs.s3a.access.key=minioadmin
               --conf spark.hadoop.fs.s3a.secret.key=minioadmin
               --conf spark.ui.port=4041
-              --conf hive.metastore.uris=thrift://hive-metastore.spark-apps:9083
               --conf spark.kubernetes.file.upload.path=s3a://osds-data/tmp
               --packages 'io.delta:delta-spark_2.12:3.1.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4' \
               && tail -f /opt/spark/logs/spark--org.apache.*
