@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  spark:
+    image: howdyhow9/spark-delta-local:v1.0.1
+    networks:
+      - osds
+    volumes:
+      - ./data:/opt/spark/work-dir/data
+      - ./scripts:/opt/spark/work-dir/scripts
+      - ./source_files:/opt/spark/work-dir/source_files
+    env_file:
+      - .env.spark
+    environment:
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - SPARK_EXTRA_CONF_DIR=/opt/spark/conf
+    ports:
+      - "4040:4040"  # Spark UI
+      - "7077:7077"  # Spark Master
+      - "8080:8080"  # Spark UI
+    command: bash -c "/opt/spark/sbin/start-master.sh && tail -f /dev/null"
+    depends_on:
+      - hive-metastore
+      - minio
+
+  postgres:
+    networks:
+      - osds
+    image: postgres:16
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=md5
+      - POSTGRES_DB=hive_metastore
+      - POSTGRES_USER=hive
+      - POSTGRES_PASSWORD=hivepass123
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+
+  hive-metastore:
+    image: apache/hive:4.0.0-alpha-2
+    networks:
+      - osds
+    environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - SERVICE_OPTS=-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/hive_metastore -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=hivepass123
+    ports:
+      - "9083:9083"
+    volumes:
+      - ./data/delta/osdp/spark-warehouse:/opt/spark/work-dir/data/delta/osdp/spark-warehouse
+    depends_on:
+      - postgres
+
+  minio:
+    image: minio/minio:latest
+    networks:
+      - osds
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # MinIO bucket creation service
+  minio-mc:
+    image: minio/mc
+    networks:
+      - osds
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (mc config host add myminio http://minio:9000 minioadmin minioadmin) do echo '...waiting for MinIO...' && sleep 1; done;
+      mc mb myminio/delta-lake;
+      mc policy set public myminio/delta-lake;
+      exit 0;
+      "
+
+volumes:
+  postgres-data:
+  warehouse:
+  minio-data:
+
+networks:
+  osds:

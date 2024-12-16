@@ -1,0 +1,45 @@
+FROM spark:3.5.0-scala2.12-java11-python3-ubuntu
+USER root
+# Specify the official Spark User, working directory, and entry point
+WORKDIR /opt/spark/work-dir
+
+# Preinstall dependencies
+COPY ./spark8s/requirements.txt ${WORKDIR}/requirements.txt
+
+# Install Delta Lake dependencies
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r ${WORKDIR}/requirements.txt \
+    && rm -f ${WORKDIR}/requirements.txt
+
+# Configure environment variables
+ARG osdsuser=osdsuser
+ARG GROUP=osdsuser
+ARG WORKDIR=/opt/spark/work-dir
+ENV DELTA_PACKAGE_VERSION=delta-spark_2.12:${DELTA_SPARK_VERSION}
+ENV PATH="/opt/spark/sbin:/opt/spark/bin:${PATH}"
+ENV SPARK_HOME="/opt/spark"
+ENV PYSPARK_PYTHON python3
+
+# Set up system user and utilities
+RUN groupadd -r ${GROUP} && useradd -r -m -g ${GROUP} ${osdsuser}
+RUN apt -qq update
+RUN apt -qq -y install vim curl
+
+# Install required JAR files and configurations
+COPY --chown=${osdsuser} ./spark8s/source_files/spark_delta/spark_venv/spark_home/jars/* /opt/spark/jars/
+COPY --chown=${osdsuser} ./spark8s/source_files/spark_delta/spark_venv/spark_home/conf/hive-site.xml /opt/spark/conf/hive-site.xml
+
+# Add AWS Hadoop JARs for S3 compatibility
+RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar -o /opt/spark/jars/hadoop-aws-3.3.4.jar
+RUN curl -L https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.261/aws-java-sdk-bundle-1.12.261.jar -o /opt/spark/jars/aws-java-sdk-bundle-1.12.261.jar
+
+# Create and configure spark-defaults.conf
+RUN echo "spark.hadoop.fs.s3a.endpoint=http://minio:9000" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.hadoop.fs.s3a.access.key=minioadmin" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.hadoop.fs.s3a.secret.key=minioadmin" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.hadoop.fs.s3a.path.style.access=true" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" >> /opt/spark/conf/spark-defaults.conf
+
+USER ${osdsuser}
